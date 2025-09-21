@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ contenido.titulo }}{% endblock %}
+{% block content %}
+<section class="movie-detail">
+    <h2>{{ contenido.titulo }}</h2>
+    <p><b>Tipo:</b> {{ contenido.tipo }}</p>
+    <p><b>Género:</b> {{ contenido.genero }}</p>
+    <p><b>Director:</b> {{ contenido.director }}</p>
+    <p>{{ contenido.descripcion }}</p>
+
+    <hr>
+    <h3>Reseñas</h3>
+    {% if resenias %}
+        <ul class="reviews">
+        {% for r in resenias %}
+            <li><b>{{ r.user_name }}</b> — ⭐ {{ r.puntuacion }} <br> {{ r.comentario }}</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>Aún no hay reseñas.</p>
+    {% endif %}
+
+    {% if session.get('user') %}
+        <form method="POST" action="{{ url_for('main.movie_detail', contenido_id=contenido.id_contenido) }}">
+            <textarea name="comentario" required placeholder="Escribe una reseña..."></textarea>
+            <label>Puntuación</label>
+            <select name="puntuacion" required>
+                <option value="1">1</option><option value="2">2</option>
+                <option value="3">3</option><option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+            <button class="btn" type="submit">Enviar reseña</button>
+        </form>
+    {% else %}
+        <p><a href="{{ url_for('main.login') }}">Inicia sesión</a> para escribir reseñas.</p>
+    {% endif %}
+</section>
+{% endblock %}

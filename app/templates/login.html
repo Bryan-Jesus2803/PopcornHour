@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión{% endblock %}
+{% block content %}
+<div class="auth-container">
+  <h2>Iniciar Sesión</h2>
+  <form method="POST" action="{{ url_for('main.login') }}">
+    <label>Correo</label>
+    <input type="email" name="email" placeholder="Correo"required>
+    <label>Contraseña</label>
+    <div class="form-group password-wrapper">
+        <input type="password" id="password" name="password" placeholder="Contraseña" required>
+        <span class="toggle-password" onclick="togglePassword('password', this)">🔐</span>
+    </div>
+    <button class="btn" type="submit">Iniciar Sesión</button>
+  </form>
+  <p>¿No tienes cuenta? <a href="{{ url_for('main.signup') }}">Crear cuenta</a></p>
+</div>
+
+<script>
+function togglePassword(id) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}
+

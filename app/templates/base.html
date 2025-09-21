@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PopcornHour</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='assets/logo.png') }}" alt="Logo" class="logo">
+            <h1 class="site-title">PopcornHour</h1>
+        </div>
+
+        <div class="search-bar">    
+            <input id="searchInput" type="text" placeholder="Buscar películas o series...">
+        </div>
+
+        <div class="user-actions">
+            {% if session.get('user') %}
+                <!-- Usuario logueado -->
+                <div class="user-menu">
+                    <img src="{{ url_for('static', filename='assets/default_user.png') }}" alt="Usuario" class="user-avatar" onclick="toggleMenu()">
+                    <div id="dropdown" class="dropdown hidden">
+                        <div class="dropdown-item">Hola, {{ session['user'].get('nombre_usuario') }}</div>
+                        <a href="{{ url_for('main.logout') }}" class="dropdown-item">Cerrar Sesión</a>
+                        {% if session['user'].get('rol') == 'admin' %}
+                            <a href="{{ url_for('main.admin') }}" class="dropdown-item">Panel Admin</a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <!-- Landing / visitante -->
+                <a href="{{ url_for('main.login') }}" class="btn-login">Ingresar</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+            {% for category, msg in messages %}
+                <div class="flash {{ category }}">{{ msg }}</div>
+            {% endfor %}
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+<script>
+function toggleMenu() {
+  const menu = document.getElementById('dropdown');
+  menu.classList.toggle('hidden');
+}
+function requireLogin() {
+  alert("Debes iniciar sesión para realizar esa acción.");
+  window.location.href = "{{ url_for('main.login') }}";
+}
+
+function togglePassword(id, el) {
+    const input = document.getElementById(id);
+    if (input.type === "password") {
+        input.type = "text";
+        el.textContent = "🔓"; // ícono de ocultar
+    } else {
+        input.type = "password";
+        el.textContent = "🔐"; // ícono de mostrar
+    }
+}
+</script>   
+</body>
+</html>

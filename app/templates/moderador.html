@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Panel Admin{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>Panel de Administración</h2>
+    <form method="POST" action="{{ url_for('main.admin') }}">
+        <!-- TITULO -->
+        <label>Título</label>
+        <input type="text" name="titulo" required>
+
+        <!-- TIPO pelicula/serie -->
+        <label>Tipo</label>
+        <select name="tipo" required>
+            <option value="pelicula">Película</option>
+            <option value="serie">Serie</option>
+        </select>
+
+        <!-- AÑO DE LANZAMIENTO -->
+        <label>Año (int)</label>
+        <input type="number" name="fecha_lanzamiento">
+
+        <!-- GENERO -->
+        <label>Género</label>
+        <input type="text" name="genero">
+        
+        <!-- DIRECTOR -->
+        <label>Director</label>
+        <input type="text" name="director">
+        
+        <!-- SINOPSIS -->
+        <label>Descripción</label>
+        <textarea name="descripcion"></textarea>
+        <button class="btn" type="submit">Agregar</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% block body_class %}solid-bg{% endblock %}
 {% block title %}Panel Admin{% endblock %}
 {% block content %}
 <div class="container">
     <h2>Panel de Administración</h2>
-    <form method="POST" action="{{ url_for('main.admin') }}">
+    <form method="POST" action="{{ url_for('main.admin') }}" enctype="multipart/form-data">
         <!-- TITULO -->
         <label>Título</label>
         <input type="text" name="titulo" required>
@@ -31,6 +32,12 @@
         <label>Descripción</label>
         <textarea name="descripcion"></textarea>
         <button class="btn" type="submit">Agregar</button>
+
+        <!-- POSTER -->
+        <label>Póster</label>
+        <input type="file" name="poster" accept=".png,.jpg,.jpeg,.gif,.webp">
+        
+        <button type="submit">Agregar</button>
     </form>
 </div>
 {% endblock %}

@@ -1,28 +1,53 @@
 {% extends "base.html" %}
+{% block body_class %}solid-bg{% endblock %}
 {% block title %}Inicio{% endblock %}
-
 {% block content %}
 <section class="content-section">
-  <h2>Contenido disponible</h2>
+    <h2>Contenido disponible</h2>
     <div class="movies-grid">
         {% for c in contenido %}
         <div class="movie-card">
-            <h3>{{ c.titulo }}</h3>
-            <p class="meta">{{ c.tipo|capitalize }} | {{ c.genero }}</p>
-            <a href="{{ url_for('main.movie_detail', contenido_id=c.id_contenido) }}" class="btn">Ver más</a>
+            <img class="poster" src="{{ c.poster_url or url_for('static', filename='assets/default_poster.png') }}"
+                alt="{{ c.titulo }}">
+            <div class="movie-info">
+                <h3>{{ c.titulo }}</h3>
+                <p class="meta">{{ c.tipo|capitalize }} | {{ c.genero }}</p>
+            </div>
 
-            <!-- Acciones: si no está logueado, mostrar botones que exigen login -->
-            <div class="actions">
-            {% if session.get('user') %}
-                <a href="#" class="btn small">Favorito</a>
-                <a href="#" class="btn small">Comentar</a>
-            {% else %}
-                <button class="btn small disabled" onclick="requireLogin()">Favorito</button>
+            <div class="movie-actions">
+                <form action="{{ url_for('main.movie_detail', contenido_id=c.id_contenido) }}"
+                    style="display:inline;">
+                    <button class="btn detalles">Ver más</button>
+                </form>
+                
+                {% if session.get('user') %}
+                <button class="btn small">Comentar</button>
+                <form method="POST" action="{{ url_for('main.toggle_favorite', contenido_id=c.id_contenido) }}"
+                    style="display:inline;">
+                    <button class="btn small" type="submit">
+                        {% if c.id_contenido in favorite_ids %}Quitar favorito{% else %}Favorito{% endif %}
+                    </button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('main.toggle_favorite', contenido_id=c.id_contenido) }}"
+                    style="display:inline;">
+                    <button class="btn small disabled" type="submit">
+                        {% if c.id_contenido in favorite_ids %}Quitar favorito{% else %}Favorito{% endif %}
+                    </button>
+                </form>
                 <button class="btn small disabled" onclick="requireLogin()">Comentar</button>
-            {% endif %}
+                {% endif %}
             </div>
         </div>
         {% endfor %}
+    </div>
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('main.index', q=q, genre=genre, page=page-1) }}" class="btn small">Anterior</a>
+        {% endif %}
+        {% if contenido|length == per_page %}
+        <a href="{{ url_for('main.index', q=q, genre=genre, page=page+1) }}" class="btn small">Siguiente</a>
+        {% endif %}
     </div>
 </section>
 {% endblock %}

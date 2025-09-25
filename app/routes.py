@@ -1,14 +1,47 @@
+import os
+from uuid import uuid4
+from werkzeug.utils import secure_filename
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-from .config import supabase
+from .config import supabase, SUPABASE_URL
 
 main_bp = Blueprint("main", __name__)
 
-# ---------------- INDEX ----------------
+ALLOWED_EXT = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
+
+# ---------------- INDEX (publico) y BUSQUEDA / PAGINACION----------------
 @main_bp.route("/")
 def index():
-    contenido = supabase.table("contenido").select("*").order("created_at", desc=True).execute().data or []
-    return render_template("index.html", contenido=contenido)
+    
+    q = request.args.get("q", "").strip()
+    genre = request.args.get("genre", "").strip()
+    page = int(request.args.get("page", 1))
+    per_page = int(request.args.get("per_page", 12))
+    offset = (page - 1) * per_page
+
+    query = supabase.table("contenido").select("*")
+
+    if q:
+        # Buscamos por título con ilike
+        query = query.filter("titulo", "ilike", f"%{q}%")
+    if genre:
+        # Buscamos por genero
+        query = query.eq("genero", genre)
+
+    # Paginación con range
+    res = query.order("created_at", desc=True).range(offset, offset + per_page - 1).execute()
+    contenido = res.data or []
+
+    # Si usuario está logueado, traer sus favoritos (para mostrar estado)
+    favorite_ids = set()
+    if "user" in session:
+        fav_res = supabase.table("favoritos").select("id_contenido").eq("id_usuario", session["user"]["id_usuario"]).execute()
+        if fav_res.data:
+            favorite_ids = {f["id_contenido"] for f in fav_res.data}
+
+    # Usamos same template (index) que visually muestra el contenido
+    return render_template("index.html", contenido=contenido, favorite_ids=favorite_ids,
+                           q=q, genre=genre, page=page, per_page=per_page)
 
 # ---------------- Registro ----------------
 @main_bp.route("/signup", methods=["GET", "POST"])
@@ -50,7 +83,7 @@ def signup():
         else:
             flash("Error al crear la cuenta", "error")
 
-    return render_template("signup.html")
+    return render_template("signup.html", hide_search=True)
 
 # ---------------- LOGIN ----------------
 @main_bp.route("/login", methods=["GET", "POST"])
@@ -78,7 +111,7 @@ def login():
         else:
             flash("Contraseña incorrecta")
 
-    return render_template("login.html")
+    return render_template("login.html", hide_search=True)
 
 # ---------------- LOGOUT ----------------
 @main_bp.route("/logout")
@@ -91,9 +124,28 @@ def logout():
 @main_bp.route("/home")
 def home():
     if "user" not in session:
-        return redirect(url_for("main.login"))
-    contenido = supabase.table("contenido").select("*").order("created_at", desc=True).execute().data or []
-    return render_template("home.html", contenido=contenido)
+        return redirect(url_for("main.index"))
+    
+    # Reusamos lógica similar a index pero pasar user-friendly favoritos
+    q = request.args.get("q", "").strip()
+    genre = request.args.get("genre", "").strip()
+    page = int(request.args.get("page", 1))
+    per_page = int(request.args.get("per_page", 12))
+    
+    offset = (page - 1) * per_page
+    query = supabase.table("contenido").select("*")
+    if q:
+        query = query.filter("titulo", "ilike", f"%{q}%")
+    if genre:
+        query = query.eq("genero", genre)
+    res = query.order("created_at", desc=True).range(offset, offset + per_page - 1).execute()
+    contenido = res.data or []
+
+    fav_res = supabase.table("favoritos").select("id_contenido").eq("id_usuario", session["user"]["id_usuario"]).execute()
+    favorite_ids = {f["id_contenido"] for f in (fav_res.data or [])}
+
+    return render_template("home.html", contenido=contenido, favorite_ids=favorite_ids,
+                           q=q, genre=genre, page=page, per_page=per_page)
 
 # ---------------- DETALLE CONTENIDO ----------------
 @main_bp.route("/contenido/<int:contenido_id>", methods=["GET", "POST"])
@@ -146,7 +198,29 @@ def movie_detail(contenido_id):
 
     return render_template("detalle_contenido.html", contenido=contenido, resenias=resenias)
 
-# ---------------- Admin (solo rol admin) ----------------
+# ---------- TOGGLE FAVORITO ----------
+@main_bp.route("/favorito/toggle/<int:contenido_id>", methods=["POST"])
+def toggle_favorite(contenido_id):
+    if "user" not in session:
+        flash("Debes iniciar sesión para usar favoritos.", "error")
+        return redirect(url_for("main.login"))
+
+    user_id = session["user"]["id_usuario"]
+
+    # Verificar si ya existe
+    exists = supabase.table("favoritos").select("*").eq("id_usuario", user_id).eq("id_contenido", contenido_id).execute()
+    if exists.data:
+        # eliminar
+        supabase.table("favoritos").delete().match({"id_usuario": user_id, "id_contenido": contenido_id}).execute()
+        flash("Eliminado de favoritos.", "success")
+    else:
+        supabase.table("favoritos").insert({"id_usuario": user_id, "id_contenido": contenido_id}).execute()
+        flash("Agregado a favoritos.", "success")
+
+    # Volver a la página anterior (referrer)
+    return redirect(request.referrer or url_for("main.home"))
+
+# ---------------- Admin: subir contenido + poster (archivo) ----------------
 @main_bp.route("/admin", methods=["GET", "POST"])
 def admin():
     if "user" not in session or session["user"].get("rol") != "admin":
@@ -161,11 +235,36 @@ def admin():
         descripcion = request.form.get("descripcion")
         director = request.form.get("director")
 
-        # valida
+        # validar fecha
         try:
             fecha_int = int(fecha_lanzamiento) if fecha_lanzamiento else None
         except ValueError:
             fecha_int = None
+
+        # manejar poster
+        poster_url = None
+        file = request.files.get("poster")
+        if file and file.filename:
+            fname = secure_filename(file.filename)
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in ALLOWED_EXT:
+                flash("Tipo de archivo no permitido para póster.", "error")
+                return redirect(url_for("main.admin"))
+            
+            # generar key único
+            key = f"posters/{uuid4().hex}{ext}"
+
+            try: 
+                # Leer bytes (puede ser grande: cuidado con límites)
+                file_bytes = file.read()
+                # subir bytes al bucket 'posters'
+                supabase.storage.from_('posters').upload(key, file_bytes)
+                # formar URL pública (si bucket es público)
+                poster_url = f"{SUPABASE_URL}/storage/v1/object/public/posters/{key}"
+            except Exception as e:
+                print("Error subiendo a storage:", e)
+                flash("Error subiendo el póster. Revisa la configuración de Storage y la clave.", "error")
+                return redirect(url_for("main.admin"))
 
         nuevo = {
             "titulo": titulo,
@@ -173,7 +272,8 @@ def admin():
             "fecha_lanzamiento": fecha_int,
             "genero": genero,
             "descripcion": descripcion,
-            "director": director
+            "director": director,
+            "poster_url": poster_url
         }
         supabase.table("contenido").insert(nuevo).execute()
         flash("Contenido agregado con éxito", "success")
